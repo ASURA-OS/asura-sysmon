@@ -18,6 +18,7 @@ type GPUStats struct {
 	MemoryFreeMB   uint64  `json:"memoryFreeMB"`
 	MemoryUsedPct  float64 `json:"memoryUsedPct"`
 	TempC          float64 `json:"tempC"`
+	IsVirtual      bool    `json:"isVirtual"`
 }
 
 var pciVendorNames = map[string]string{
@@ -86,7 +87,7 @@ func queryNvidiaGPU() []GPUStats {
 }
 
 // resolveDeviceModel tries lspci for an accurate name; falls back to vendor name.
-func resolveDeviceModel(cardPath string, vendorID, defaultName string) string {
+func resolveDeviceModel(cardPath string, defaultName string) string {
 	if _, err := exec.LookPath("lspci"); err != nil {
 		return defaultName
 	}
@@ -156,7 +157,7 @@ func queryDRMGPU(hasNvidia bool) []GPUStats {
 			}
 		}
 
-		friendlyName := resolveDeviceModel(card, vendorID, defaultName)
+		friendlyName := resolveDeviceModel(card, defaultName)
 
 		var utilPct float64
 		var totalMB, usedMB, freeMB uint64
@@ -235,6 +236,8 @@ func queryDRMGPU(hasNvidia bool) []GPUStats {
 			usedPct = (float64(usedMB) / float64(totalMB)) * 100.0
 		}
 
+		isVirtual := vendorKey == "vmware" || vendorKey == "virtualbox" || vendorKey == "virtio" || vendorID == "0x1234"
+
 		gpus = append(gpus, GPUStats{
 			Name:           friendlyName,
 			Vendor:         vendorKey,
@@ -244,6 +247,7 @@ func queryDRMGPU(hasNvidia bool) []GPUStats {
 			MemoryFreeMB:   freeMB,
 			MemoryUsedPct:  usedPct,
 			TempC:          tempC,
+			IsVirtual:      isVirtual,
 		})
 	}
 

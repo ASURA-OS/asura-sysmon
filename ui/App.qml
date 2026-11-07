@@ -7,6 +7,9 @@ Rectangle {
     id: root
     color: "#0c0d12"
 
+    readonly property string fontUi: "Space Grotesk, Inter, system-ui, -apple-system, sans-serif"
+    readonly property string fontMono: "JetBrainsMono Nerd Font, JetBrains Mono, monospace"
+
     property string currentTab: "performance" // performance, processes, storage, system
     property var stats: ({
         cpu: { usagePercent: 0, cores: [], tempC: 0 },
@@ -34,6 +37,7 @@ Rectangle {
     }
 
     function fmtRate(b) {
+        if (!b || b <= 0) return "0 B/s";
         return fmtBytes(b) + "/s";
     }
 
@@ -134,7 +138,7 @@ Rectangle {
             Text {
                 text: "Resource Monitor"
                 color: "#ffffff"
-                font.family: "Space Grotesk, Inter, sans-serif"
+                font.family: root.fontUi
                 font.pixelSize: 15
                 font.weight: Font.DemiBold
                 anchors.verticalCenter: parent.verticalCenter
@@ -150,7 +154,7 @@ Rectangle {
             Text {
                 text: "ASURA OS"
                 color: "#6b7280"
-                font.family: "JetBrainsMono Nerd Font, monospace"
+                font.family: root.fontMono
                 font.pixelSize: 10
                 font.weight: Font.Medium
                 font.letterSpacing: 1.5
@@ -185,9 +189,9 @@ Rectangle {
                         anchors.centerIn: parent
                         text: modelData.label
                         color: root.currentTab === modelData.id ? "#ffffff" : "#9ca3af"
-                        font.family: "Inter, sans-serif"
+                        font.family: root.fontUi
                         font.pixelSize: 12
-                        font.weight: root.currentTab === modelData.id ? Font.SemiBold : Font.Normal
+                        font.weight: root.currentTab === modelData.id ? Font.DemiBold : Font.Normal
                     }
 
                     MouseArea {
