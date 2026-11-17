@@ -12,9 +12,9 @@ Designed natively for [Asura OS](https://github.com/mohitjoer/ASURA-OS) with a p
 - **Power & Battery**: Real-time battery %, charging/discharging wattage, voltage, and health status for laptops and portables.
 - **Storage & Disk I/O**: Real-time read/write speeds (bytes/sec) and IOPS, top-level block device enumeration, and filesystem filtering (excluding pseudo-filesystems like `efivarfs`).
 - **Network I/O**: Live upload and download throughput rates per second, total bandwidth, interface monitoring.
-- **Process Manager**: Searchable task list sorted by memory or CPU, thread counts, process status, and safe process termination ("End Task").
+- **Process Manager**: Every process with its CPU and memory use, sortable by any column, searchable by name, PID, user or command line. Ending a process asks first (End or Force quit) and explains why when it can't.
 - **Universal Hardware Support**: Automatically adapts across laptops, desktops, servers, and virtual machines without runtime failures.
-- **Pure Monochrome**: Official Asura OS dark visual register with zero external styling dependencies.
+- **Follows your theme**: Colours and fonts come from the ASURA shell's design tokens, so the monitor matches the colour scheme or wallpaper palette you picked in the Hub, light or dark.
 
 ## CLI Usage
 
@@ -25,8 +25,9 @@ asura-sysmon stats
 # Sample with custom delta interval
 asura-sysmon stats --interval 500
 
-# Top running processes
+# Top running processes, by memory or by CPU (sampled over --interval ms)
 asura-sysmon proc --limit 20 --sort mem
+asura-sysmon proc --limit 20 --sort cpu --interval 250
 
 # Terminate process safely
 asura-sysmon kill <pid>
@@ -36,7 +37,29 @@ asura-sysmon kill <pid> --force
 asura-sysmon
 ```
 
+## Keyboard
+
+| Keys | Does |
+|---|---|
+| Ctrl+1 … Ctrl+4 | Performance, Processes, Storage, System |
+| Ctrl+Tab, Ctrl+Shift+Tab | Next or previous tab |
+| Ctrl+F or `/` | Search processes |
+| ↑ / ↓ | Select a process |
+| Delete | End the selected process (asks first; Enter confirms) |
+| Esc | Back out: cancel, clear the search, then deselect |
+| Ctrl+Q, Ctrl+W | Close |
+
 ## Build & Test
+
+On ASURA OS (or any Void Linux system):
+
+```sh
+sudo xbps-install -S go gcc make
+```
+
+The window is part of the ASURA shell: it imports the shell's design tokens
+(`qs.Ui.Singletons`), so it runs from the shell tree (`shell/sysmon.qml` in ASURA OS),
+not from a bare checkout.
 
 ```sh
 # Run tests under race detector

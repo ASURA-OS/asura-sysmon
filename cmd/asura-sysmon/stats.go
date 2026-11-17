@@ -239,19 +239,23 @@ func CollectMemoryStats() (MemStats, SwapStats, error) {
 		swapPct = float64(swapUsed) / float64(swapTotal) * 100.0
 	}
 
-	return MemStats{
-			TotalBytes:     total,
-			AvailableBytes: avail,
-			UsedBytes:      used,
-			UsedPercent:    memPct,
-			CachedBytes:    cached,
-			BuffersBytes:   buffers,
-		}, SwapStats{
-			TotalBytes:  swapTotal,
-			UsedBytes:   swapUsed,
-			FreeBytes:   swapFree,
-			UsedPercent: swapPct,
-		}, nil
+	// Built as two values first: gofmt from Go 1.26 and 1.27 indent a
+	// multi-value return of composite literals differently.
+	mem := MemStats{
+		TotalBytes:     total,
+		AvailableBytes: avail,
+		UsedBytes:      used,
+		UsedPercent:    memPct,
+		CachedBytes:    cached,
+		BuffersBytes:   buffers,
+	}
+	swap := SwapStats{
+		TotalBytes:  swapTotal,
+		UsedBytes:   swapUsed,
+		FreeBytes:   swapFree,
+		UsedPercent: swapPct,
+	}
+	return mem, swap, nil
 }
 
 func readNetDev() ([]NetIf, uint64, uint64, error) {

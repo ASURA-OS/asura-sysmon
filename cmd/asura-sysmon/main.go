@@ -27,8 +27,9 @@ Commands:
   ui, open, (default)  Launch the Quickshell Resource Monitor window
 
 Options for 'proc':
-  --sort <field>       Sort by: mem (default), pid, name
+  --sort <field>       Sort by: mem (default), cpu, pid, name
   --limit <n>          Cap results to n entries (default 100, 0 for all)
+  --interval <ms>      CPU usage sample interval in ms (default 200, 0 skips it)
 
 Options for 'stats':
   --interval <ms>      Sample interval for CPU & Network deltas in ms (default 200)
@@ -69,11 +70,12 @@ func main() {
 
 	case "proc":
 		procCmd := flag.NewFlagSet("proc", flag.ExitOnError)
-		sortBy := procCmd.String("sort", "mem", "Sort by: mem, pid, name")
-		limit := procCmd.Int("limit", 100, "Limit number of processes")
+		sortBy := procCmd.String("sort", "mem", "Sort by: cpu, mem, pid, name")
+		limit := procCmd.Int("limit", 100, "Limit number of processes (0 for all)")
+		interval := procCmd.Int("interval", 200, "CPU sampling interval in milliseconds (0 skips CPU usage)")
 		procCmd.Parse(os.Args[2:])
 
-		procs, err := ListProcesses(*sortBy, *limit)
+		procs, err := ListProcessesSampled(*sortBy, *limit, time.Duration(*interval)*time.Millisecond)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "asura-sysmon: proc error: %v\n", err)
 			os.Exit(1)
