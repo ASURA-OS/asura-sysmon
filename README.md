@@ -48,3 +48,8 @@ make build
 # Install to system prefix
 sudo make install
 ```
+
+## License
+
+GNU General Public License v3.0 only. See [LICENSE](LICENSE). The same code ships
+inside [ASURA OS](https://github.com/mohitjoer/ASURA-OS) under the same licence.

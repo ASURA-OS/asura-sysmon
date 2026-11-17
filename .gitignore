@@ -1,2 +1,5 @@
 go.work
 go.work.sum
+
+# Build output (make build). CI builds the binary; it is never committed.
+/bin/
