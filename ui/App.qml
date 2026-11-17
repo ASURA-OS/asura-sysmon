@@ -1,14 +1,17 @@
 import QtQuick
+import qs.Ui.Singletons
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 
 Rectangle {
     id: root
-    color: "#0c0d12"
+    color: Tokens.paper
 
-    readonly property string fontUi: "Space Grotesk, Inter, system-ui, -apple-system, sans-serif"
-    readonly property string fontMono: "JetBrainsMono Nerd Font, JetBrains Mono, monospace"
+    readonly property color alertWash: Qt.rgba(Tokens.alert.r, Tokens.alert.g, Tokens.alert.b, 0.14)
+
+    readonly property string fontUi: Tokens.ui
+    readonly property string fontMono: Tokens.mono
 
     property string currentTab: "performance" // performance, processes, storage, system
     property var stats: ({
@@ -25,6 +28,35 @@ Rectangle {
     })
     property var processList: []
     property bool isPolling: true
+
+    // Polls since the last good stats reading. A few in a row means the
+    // backend is not answering, and the window says so instead of showing
+    // zeros that look like real readings.
+    property int pollsSinceData: 0
+    readonly property bool statsStale: pollsSinceData >= 4
+
+    readonly property var tabs: [
+        { id: "performance", label: "Performance" },
+        { id: "processes", label: "Processes" },
+        { id: "storage", label: "Storage" },
+        { id: "system", label: "System" }
+    ]
+    function selectTab(i) {
+        if (i >= 0 && i < tabs.length) root.currentTab = tabs[i].id;
+    }
+    function cycleTab(step) {
+        var i = 0;
+        for (var k = 0; k < tabs.length; k++) if (tabs[k].id === root.currentTab) i = k;
+        selectTab((i + step + tabs.length) % tabs.length);
+    }
+
+    Shortcut { sequence: "Ctrl+1"; onActivated: root.selectTab(0) }
+    Shortcut { sequence: "Ctrl+2"; onActivated: root.selectTab(1) }
+    Shortcut { sequence: "Ctrl+3"; onActivated: root.selectTab(2) }
+    Shortcut { sequence: "Ctrl+4"; onActivated: root.selectTab(3) }
+    Shortcut { sequence: "Ctrl+Tab"; onActivated: root.cycleTab(1) }
+    Shortcut { sequence: "Ctrl+Shift+Tab"; onActivated: root.cycleTab(-1) }
+    Shortcut { sequences: ["Ctrl+Q", "Ctrl+W"]; onActivated: Qt.quit() }
 
     // Rolling historical buffers for real-time waveform curves (last 48 data points)
     property var cpuHistory: []
@@ -116,6 +148,7 @@ Rectangle {
                     if (parsed && parsed.cpu) {
                         root.stats = parsed;
                         root.recordTelemetry(parsed);
+                        root.pollsSinceData = 0;
                     }
                 } catch(e) {}
             }
@@ -125,7 +158,9 @@ Rectangle {
     // Polling for active processes
     Process {
         id: procProc
-        command: ["asura-sysmon", "proc", "--limit", "120"]
+        // Every process (search must find small ones too), with CPU usage
+        // measured over 250 ms.
+        command: ["asura-sysmon", "proc", "--limit", "0", "--interval", "250"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -145,6 +180,7 @@ Rectangle {
         running: root.isPolling
         triggeredOnStart: true
         onTriggered: {
+            root.pollsSinceData++;
             if (!statsProc.running) statsProc.running = true;
             if (root.currentTab === "processes" && !procProc.running) {
                 procProc.running = true;
@@ -165,11 +201,12 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 52
-        color: "#12141a"
-        border.color: "#1e212b"
+        color: Tokens.paperLift
+        border.color: Tokens.lineSoft
         border.width: 1
 
         Row {
+            id: brand
             anchors.left: parent.left
             anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
@@ -187,14 +224,14 @@ Rectangle {
                     visible: parent.status !== Image.Ready
                     anchors.centerIn: parent
                     text: "\u25c8"
-                    color: "#ffffff"
+                    color: Tokens.ink
                     font.pixelSize: 16
                 }
             }
 
             Text {
                 text: "Resource Monitor"
-                color: "#ffffff"
+                color: Tokens.ink
                 font.family: root.fontUi
                 font.pixelSize: 15
                 font.weight: Font.DemiBold
@@ -204,13 +241,13 @@ Rectangle {
             Rectangle {
                 width: 1
                 height: 18
-                color: "#2a2d39"
+                color: Tokens.lineSoft
                 anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: "ASURA OS"
-                color: "#6b7280"
+                color: Tokens.inkFaint
                 font.family: root.fontMono
                 font.pixelSize: 10
                 font.weight: Font.Medium
@@ -219,33 +256,29 @@ Rectangle {
             }
         }
 
-        // Navigation Tabs
+        // Navigation Tabs: centred, but never over the title on a narrow window.
         Row {
-            anchors.centerIn: parent
+            x: Math.max(brand.x + brand.width + 16, (parent.width - width) / 2)
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 4
 
             Repeater {
-                model: [
-                    { id: "performance", label: "Performance" },
-                    { id: "processes", label: "Processes" },
-                    { id: "storage", label: "Storage" },
-                    { id: "system", label: "System" }
-                ]
+                model: root.tabs
 
                 delegate: Rectangle {
                     required property var modelData
                     width: tabText.implicitWidth + 24
                     height: 32
                     radius: 6
-                    color: root.currentTab === modelData.id ? "#222634" : (tabMouse.containsMouse ? "#181b24" : "transparent")
-                    border.color: root.currentTab === modelData.id ? "#374151" : "transparent"
+                    color: root.currentTab === modelData.id ? Tokens.tint10 : (tabMouse.containsMouse ? Tokens.tint5 : "transparent")
+                    border.color: root.currentTab === modelData.id ? Tokens.line : "transparent"
                     border.width: 1
 
                     Text {
                         id: tabText
                         anchors.centerIn: parent
                         text: modelData.label
-                        color: root.currentTab === modelData.id ? "#ffffff" : "#9ca3af"
+                        color: root.currentTab === modelData.id ? Tokens.ink : Tokens.inkDim
                         font.family: root.fontUi
                         font.pixelSize: 12
                         font.weight: root.currentTab === modelData.id ? Font.DemiBold : Font.Normal
@@ -277,7 +310,7 @@ Rectangle {
 
                 Text {
                     text: "UPTIME " + root.fmtUptime(root.stats.uptimeSecs)
-                    color: "#6b7280"
+                    color: Tokens.inkFaint
                     font.family: root.fontMono
                     font.pixelSize: 10
                     font.weight: Font.Medium
@@ -286,13 +319,13 @@ Rectangle {
 
                 Rectangle {
                     width: 1; height: 12
-                    color: "#2a2d39"
+                    color: Tokens.lineSoft
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
                 Text {
                     text: "LOAD " + (root.stats && root.stats.loadAvg ? root.stats.loadAvg[0].toFixed(2) : "0.00")
-                    color: "#9ca3af"
+                    color: Tokens.inkDim
                     font.family: root.fontMono
                     font.pixelSize: 10
                     font.weight: Font.Medium
@@ -306,14 +339,14 @@ Rectangle {
                 width: 28
                 height: 28
                 radius: 6
-                color: closeMouse.containsMouse ? "#2d1616" : "#181a22"
-                border.color: closeMouse.containsMouse ? "#7f1d1d" : "#282b37"
+                color: closeMouse.containsMouse ? root.alertWash : Tokens.tint5
+                border.color: closeMouse.containsMouse ? Tokens.alert : Tokens.lineSoft
                 border.width: 1
 
                 Text {
                     anchors.centerIn: parent
                     text: "\u2715"
-                    color: closeMouse.containsMouse ? "#ef4444" : "#9ca3af"
+                    color: closeMouse.containsMouse ? Tokens.alert : Tokens.inkDim
                     font.pixelSize: 12
                 }
 
@@ -328,10 +361,34 @@ Rectangle {
         }
     }
 
+    // ── Backend not answering ──────────────────────────────────────────────
+    Rectangle {
+        id: staleBanner
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: root.statsStale ? 34 : 0
+        visible: root.statsStale
+        color: root.alertWash
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: parent.left
+            anchors.leftMargin: 16
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            elide: Text.ElideRight
+            text: "Can't read system statistics: asura-sysmon is not answering. The numbers below are out of date."
+            color: Tokens.alert
+            font.family: root.fontUi
+            font.pixelSize: 12
+        }
+    }
+
     // ── Tab Views ───────────────────────────────────────────────────────────
     Item {
         id: viewHost
-        anchors.top: header.bottom
+        anchors.top: staleBanner.bottom
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
