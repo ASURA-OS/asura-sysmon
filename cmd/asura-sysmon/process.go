@@ -48,6 +48,59 @@ func usernameFromUID(uid int) string {
 	return name
 }
 
+// resolveProcessName expands truncated names from /proc/[pid]/stat comm (TASK_COMM_LEN=16)
+// and identifies generic runtimes (like quickshell or python) by their target argument.
+func resolveProcessName(comm string, cmdline string) string {
+	if cmdline == "" || strings.HasPrefix(cmdline, "[") {
+		return comm
+	}
+	args := strings.Fields(cmdline)
+	if len(args) == 0 {
+		return comm
+	}
+	base0 := filepath.Base(args[0])
+
+	// For quickshell instances, clarify what's running (e.g. desktop shell, sysmon, hub, wallpaper)
+	if base0 == "quickshell" || comm == "quickshell" {
+		for i, arg := range args {
+			if (arg == "-p" || arg == "--path") && i+1 < len(args) {
+				p := strings.TrimSuffix(args[i+1], ".qml")
+				return fmt.Sprintf("quickshell (%s)", filepath.Base(p))
+			}
+			if strings.HasPrefix(arg, "--path=") {
+				p := strings.TrimSuffix(strings.TrimPrefix(arg, "--path="), ".qml")
+				return fmt.Sprintf("quickshell (%s)", filepath.Base(p))
+			}
+		}
+		return "quickshell"
+	}
+
+	// For interpreters like python / node / ruby / perl
+	if base0 == "python" || base0 == "python3" || base0 == "node" || base0 == "ruby" || base0 == "perl" {
+		rest := args[1:]
+		for i := 0; i < len(rest); i++ {
+			arg := rest[i]
+			switch {
+			case arg == "-m" && i+1 < len(rest):
+				// python3 -m http.server: the module is the program.
+				return fmt.Sprintf("%s (%s)", base0, rest[i+1])
+			case arg == "-c" || arg == "-e":
+				// Inline code, not a script: there is no better name.
+				return base0
+			case !strings.HasPrefix(arg, "-"):
+				return fmt.Sprintf("%s (%s)", base0, filepath.Base(arg))
+			}
+		}
+	}
+
+	// If comm was truncated to 15 chars (kernel TASK_COMM_LEN limit), use the untruncated base0
+	if len(comm) >= 15 && len(base0) > len(comm) && strings.HasPrefix(base0, comm) {
+		return base0
+	}
+
+	return comm
+}
+
 func readProcess(pid int, totalMem uint64) (*ProcessInfo, error) {
 	procDir := fmt.Sprintf("/proc/%d", pid)
 
@@ -119,7 +172,7 @@ func readProcess(pid int, totalMem uint64) (*ProcessInfo, error) {
 	return &ProcessInfo{
 		PID:         pid,
 		PPID:        ppid,
-		Name:        name,
+		Name:        resolveProcessName(name, cmdline),
 		Cmdline:     cmdline,
 		User:        usernameFromUID(uid),
 		UID:         uid,

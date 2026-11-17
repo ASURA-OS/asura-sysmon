@@ -509,6 +509,11 @@ Item {
 
                 readonly property bool selected: tab.selectedPID === pid
 
+                // The full command on hover, without having to select the row.
+                ToolTip.visible: rowMouse.containsMouse && cmdline.length > 0
+                ToolTip.text: cmdline
+                ToolTip.delay: 500
+
                 width: procListView.width
                 height: 32
                 radius: Tokens.radius
