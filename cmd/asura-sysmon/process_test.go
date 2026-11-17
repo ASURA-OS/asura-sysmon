@@ -2,7 +2,9 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestListProcesses(t *testing.T) {
@@ -48,5 +50,75 @@ func TestKillProcessSafety(t *testing.T) {
 	}
 	if err := KillProcess(0, false); err == nil {
 		t.Fatalf("expected error refusing to kill PID 0")
+	}
+}
+
+func TestProcessCPUPercent(t *testing.T) {
+	cases := []struct {
+		name           string
+		p1, p2, t1, t2 uint64
+		want           float64
+	}{
+		{"idle process", 50, 50, 1000, 1800, 0},
+		{"one of eight cores busy", 0, 100, 0, 800, 12.5},
+		{"whole machine", 0, 800, 0, 800, 100},
+		{"total did not move", 0, 10, 500, 500, 0},
+		{"counter went backwards (pid reused)", 90, 10, 0, 800, 0},
+		{"clamped above 100", 0, 900, 0, 800, 100},
+	}
+	for _, c := range cases {
+		if got := processCPUPercent(c.p1, c.p2, c.t1, c.t2); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// A process spinning on a CPU must show up with non-zero usage, and sorting
+// by cpu must put it ahead of an idle one.
+func TestListProcessesSampledMeasuresCPU(t *testing.T) {
+	stop := make(chan struct{})
+	go func() {
+		x := 0
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				x++
+			}
+		}
+	}()
+	defer close(stop)
+
+	procs, err := ListProcessesSampled("cpu", 0, 300*time.Millisecond)
+	if err != nil {
+		t.Fatalf("ListProcessesSampled: %v", err)
+	}
+	me := os.Getpid()
+	for i, p := range procs {
+		if p.PID != me {
+			continue
+		}
+		if p.CPUPercent <= 0 {
+			t.Fatalf("busy test process %d reported %v%% CPU", me, p.CPUPercent)
+		}
+		for _, q := range procs[:i] {
+			if q.CPUPercent < p.CPUPercent {
+				t.Fatalf("sort=cpu: %d (%v%%) is ahead of %d (%v%%)", q.PID, q.CPUPercent, me, p.CPUPercent)
+			}
+		}
+		return
+	}
+	t.Fatalf("test process %d not listed", me)
+}
+
+func TestKillProcessExplainsMissingProcess(t *testing.T) {
+	// PID values near the kernel maximum are almost never in use.
+	err := KillProcess(4194301, false)
+	if err == nil {
+		t.Skip("PID 4194301 exists on this machine")
+	}
+	if !strings.Contains(err.Error(), "already exited") {
+		t.Fatalf("got %q, want an 'already exited' explanation", err)
 	}
 }
